@@ -1,0 +1,44 @@
+spring:
+  application:
+    name: supply-chain-platform
+
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/inventory_db}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:chorizo}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+
+server:
+  port: 8080
+
+blockchain:
+  rpc-url: ${HARDHAT_RPC_URL:http://127.0.0.1:8545}
+  contract-address: ${CONTRACT_ADDRESS:0x5FbDB2315678afecb367f032d93F642f64180aa3}
+  sender-private-key: ${SENDER_PRIVATE_KEY:0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80}
+  chain-id: ${CHAIN_ID:31337}
+  gas-price: ${GAS_PRICE:20000000000}
+  gas-limit: ${GAS_LIMIT:3000000}
+
+logging:
+  level:
+    com.inventory.blockchain: DEBUG
+    org.web3j: INFO
+    org.springframework.transaction: DEBUG
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
