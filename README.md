@@ -265,28 +265,29 @@ curl -X PUT http://localhost:8080/api/transfers/TRF-001/status \
 ### Two-Phase Commit Pattern
 
 ```mermaid
-sequenceDiagram
-    participant FE as Frontend
-    participant BE as Backend
-    participant DB as PostgreSQL
-    participant BC as Blockchain
+graph TB
+    A[1. User Creates Transfer] --> B[2. Save to PostgreSQL]
+    B --> C{Status: REQUESTED}
+    C --> D[3. Send to Blockchain]
+    D --> E[4. Get txHash + Block]
+    E --> F[5. Update PostgreSQL]
+    F --> G{Status: CONFIRMED}
+    G --> H[6. Return to User]
     
-    FE->>BE: Create Transfer
-    BE->>DB: Save (REQUESTED)
-    BE->>BC: requestTransfer()
-    BC-->>BE: txHash, blockNumber
-    BE->>DB: Update (CONFIRMED)
-    BE-->>FE: Transfer Created
+    style A fill:#61dafb
+    style C fill:#fbbf24
+    style G fill:#34d399
+    style H fill:#61dafb
 ```
 
-### Data Flow Explanation
-
-1. **User** creates transfer request via React UI
-2. **Backend** saves to PostgreSQL with `REQUESTED` status
-3. **Backend** sends transaction to Ethereum blockchain
-4. **Blockchain** returns transaction hash and block number
-5. **Backend** updates PostgreSQL with `CONFIRMED` status and blockchain proof
-6. **User** sees confirmed transfer with immutable verification
+| Step | Component | Action |
+|------|-----------|--------|
+| 1 | Frontend | User submits transfer request |
+| 2 | Backend → DB | Save transfer with REQUESTED status |
+| 3 | Backend → Blockchain | Call requestTransfer() on smart contract |
+| 4 | Blockchain → Backend | Return transaction hash and block number |
+| 5 | Backend → DB | Update transfer with CONFIRMED status |
+| 6 | Backend → Frontend | Return success with blockchain proof |
 
 ### Deterministic Hashing
 
