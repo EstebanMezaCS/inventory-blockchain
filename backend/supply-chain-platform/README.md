@@ -337,7 +337,7 @@ module.exports = {
 
 1. Start the Hardhat local node (keep this terminal open):
 ```bash
-cd hardhat-contracts
+cd chain
 npx hardhat node
 ```
 
@@ -348,7 +348,7 @@ You will see output including 20 test accounts with their private keys. Account 
 
 2. In a new terminal, deploy the contract:
 ```bash
-cd hardhat-contracts
+cd chain
 npx hardhat run scripts/deploy.js --network localhost
 ```
 
@@ -363,7 +363,8 @@ TransferLedger deployed to: 0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512
 
 1. Navigate to the Spring Boot project directory:
 ```bash
-cd supply-chain-platform
+cd C:\Users\Usuario\Desktop\inventory-blockchain\backend\supply-chain-platform
+
 ```
 
 2. Set environment variables (see Environment Variables section above).
