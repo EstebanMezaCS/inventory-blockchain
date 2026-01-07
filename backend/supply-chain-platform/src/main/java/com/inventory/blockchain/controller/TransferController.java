@@ -1,95 +1,166 @@
 package com.inventory.blockchain.controller;
 
-import com.inventory.blockchain.dto.StatusUpdateRequest;
-import com.inventory.blockchain.dto.TransferRequest;
-import com.inventory.blockchain.dto.TransferResponse;
+import com.inventory.blockchain.entity.Transfer;
+import com.inventory.blockchain.repository.TransferRepository;
+import com.inventory.blockchain.service.NotificationService;
 import com.inventory.blockchain.service.TransferService;
-import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
+import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/transfers")
+@CrossOrigin(origins = "*")
 public class TransferController {
 
     private static final Logger log = LoggerFactory.getLogger(TransferController.class);
 
+    private final TransferRepository transferRepository;
     private final TransferService transferService;
+    private final NotificationService notificationService;
 
-    public TransferController(TransferService transferService) {
+    public TransferController(TransferRepository transferRepository, 
+                              TransferService transferService,
+                              NotificationService notificationService) {
+        this.transferRepository = transferRepository;
         this.transferService = transferService;
+        this.notificationService = notificationService;
     }
 
-    @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<List<TransferResponse>> getAllTransfers() {
-        log.info("GET /api/transfers - Fetching all transfers");
-        List<TransferResponse> transfers = transferService.getAllTransfers();
-        log.debug("Found {} transfers", transfers.size());
-        return ResponseEntity.ok(transfers);
+    @GetMapping
+    public List<Transfer> getAllTransfers() {
+        log.info("GET /api/transfers");
+        return transferRepository.findAllByOrderByCreatedAtDesc();
     }
 
-    @PostMapping(
-            consumes = MediaType.APPLICATION_JSON_VALUE,
-            produces = MediaType.APPLICATION_JSON_VALUE
-    )
-    public ResponseEntity<TransferResponse> createTransfer(
-            @Valid @RequestBody TransferRequest request) {
-
-        log.info("POST /api/transfers - Creating transfer: transferId={}", request.transferId());
-
-        TransferResponse response = transferService.createTransfer(request);
-
-        log.info("Transfer created successfully: transferId={}, status={}",
-                response.transferId(), response.status());
-
-        return ResponseEntity
-                .status(HttpStatus.CREATED)
-                .body(response);
+    @GetMapping("/{id}")
+    public ResponseEntity<Transfer> getTransfer(@PathVariable String id) {
+        log.info("GET /api/transfers/{}", id);
+        return transferRepository.findByTransferId(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 
-    @GetMapping(
-            value = "/{transferId}",
-            produces = MediaType.APPLICATION_JSON_VALUE
-    )
-    public ResponseEntity<TransferResponse> getTransfer(
-            @PathVariable String transferId) {
+    @PostMapping
+    public ResponseEntity<?> createTransfer(@RequestBody Transfer transfer) {
+        log.info("POST /api/transfers - Creating transfer from {} to {}", 
+                transfer.getFromLocation(), transfer.getToLocation());
 
-        log.info("GET /api/transfers/{} - Fetching transfer", transferId);
-
-        TransferResponse response = transferService.getTransfer(transferId);
-
-        log.debug("Transfer retrieved: transferId={}, status={}", transferId, response.status());
-
-        return ResponseEntity.ok(response);
+        try {
+            // Generate transfer ID if not provided
+            if (transfer.getTransferId() == null || transfer.getTransferId().isEmpty()) {
+                transfer.setTransferId("TRF-" + System.currentTimeMillis() % 1000000);
+            }
+            
+            // Set defaults
+            if (transfer.getStatus() == null) {
+                transfer.setStatus("REQUESTED");
+            }
+            if (transfer.getCreatedAt() == null) {
+                transfer.setCreatedAt(OffsetDateTime.now());
+            }
+            
+            Transfer created = transferRepository.save(transfer);
+            
+            // Send notification
+            notificationService.notifyTransferCreated(created);
+            
+            return ResponseEntity.ok(created);
+        } catch (Exception e) {
+            log.error("Failed to create transfer: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of(
+                "error", "FAILED",
+                "message", e.getMessage()
+            ));
+        }
     }
 
-    @PutMapping(
-            value = "/{transferId}/status",
-            consumes = MediaType.APPLICATION_JSON_VALUE,
-            produces = MediaType.APPLICATION_JSON_VALUE
-    )
-    public ResponseEntity<TransferResponse> updateTransferStatus(
-            @PathVariable String transferId,
-            @Valid @RequestBody StatusUpdateRequest request) {
+    @PutMapping("/{id}/status")
+    public ResponseEntity<?> updateStatus(
+            @PathVariable String id,
+            @RequestBody Map<String, String> body) {
+        
+        String newStatus = body.get("status");
+        log.info("PUT /api/transfers/{}/status - newStatus={}", id, newStatus);
 
-        log.info("PUT /api/transfers/{}/status - Updating status to: {}", transferId, request.status());
+        Optional<Transfer> optTransfer = transferRepository.findByTransferId(id);
+        if (optTransfer.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
 
-        TransferResponse response = transferService.updateStatus(transferId, request.status());
+        Transfer transfer = optTransfer.get();
+        String oldStatus = transfer.getStatus();
 
-        log.info("Transfer status updated: transferId={}, newStatus={}", transferId, response.status());
+        // Update status
+        transfer.setStatus(newStatus);
 
-        return ResponseEntity.ok(response);
+        Transfer saved = transferRepository.save(transfer);
+        
+        // Send notification for status change
+        notificationService.notifyTransferStatusChanged(saved, oldStatus, newStatus);
+
+        return ResponseEntity.ok(saved);
+    }
+
+    @PutMapping("/{id}/confirm")
+    public ResponseEntity<?> confirmTransfer(@PathVariable String id) {
+        log.info("PUT /api/transfers/{}/confirm", id);
+        
+        return transferRepository.findByTransferId(id)
+            .map(transfer -> {
+                String oldStatus = transfer.getStatus();
+                transfer.setStatus("CONFIRMED");
+                Transfer saved = transferRepository.save(transfer);
+                notificationService.notifyTransferStatusChanged(saved, oldStatus, "CONFIRMED");
+                return ResponseEntity.ok(saved);
+            })
+            .orElse(ResponseEntity.notFound().build());
+    }
+
+    @PutMapping("/{id}/blockchain")
+    public ResponseEntity<?> updateBlockchain(
+            @PathVariable String id,
+            @RequestBody Map<String, Object> body) {
+        
+        log.info("PUT /api/transfers/{}/blockchain", id);
+
+        return transferRepository.findByTransferId(id)
+            .map(transfer -> {
+                if (body.containsKey("blockNumber")) {
+                    transfer.setBlockNumber(((Number) body.get("blockNumber")).longValue());
+                }
+                if (body.containsKey("txHash")) {
+                    transfer.setTxHash((String) body.get("txHash"));
+                }
+                if (body.containsKey("itemsHash")) {
+                    transfer.setItemsHash((String) body.get("itemsHash"));
+                }
+                return ResponseEntity.ok(transferRepository.save(transfer));
+            })
+            .orElse(ResponseEntity.notFound().build());
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> deleteTransfer(@PathVariable String id) {
+        log.info("DELETE /api/transfers/{}", id);
+        
+        return transferRepository.findByTransferId(id)
+            .map(transfer -> {
+                // Only allow deletion of REQUESTED transfers
+                if (!"REQUESTED".equals(transfer.getStatus())) {
+                    return ResponseEntity.badRequest().body(Map.of(
+                        "error", "Cannot delete transfer that is not in REQUESTED status"
+                    ));
+                }
+                transferRepository.delete(transfer);
+                return ResponseEntity.ok(Map.of("message", "Transfer deleted"));
+            })
+            .orElse(ResponseEntity.notFound().build());
     }
 }

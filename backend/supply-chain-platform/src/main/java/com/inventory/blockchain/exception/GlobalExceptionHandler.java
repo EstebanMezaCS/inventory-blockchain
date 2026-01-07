@@ -52,6 +52,24 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
     }
 
+    @ExceptionHandler(InsufficientStockException.class)
+    public ResponseEntity<ErrorResponse> handleInsufficientStock(
+            InsufficientStockException ex,
+            HttpServletRequest request) {
+
+        log.warn("Insufficient stock: location={}, sku={}, requested={}, available={}",
+                ex.getLocation(), ex.getSku(), ex.getRequested(), ex.getAvailable());
+
+        ErrorResponse error = new ErrorResponse(
+                HttpStatus.BAD_REQUEST.value(),
+                "Insufficient Stock",
+                ex.getMessage(),
+                request.getRequestURI()
+        );
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    }
+
     @ExceptionHandler(BlockchainTransactionException.class)
     public ResponseEntity<ErrorResponse> handleBlockchainTransactionError(
             BlockchainTransactionException ex,
@@ -94,6 +112,23 @@ public class GlobalExceptionHandler {
                 "Request validation failed",
                 request.getRequestURI(),
                 details
+        );
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    }
+
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<ErrorResponse> handleIllegalState(
+            IllegalStateException ex,
+            HttpServletRequest request) {
+
+        log.warn("Illegal state: {}", ex.getMessage());
+
+        ErrorResponse error = new ErrorResponse(
+                HttpStatus.BAD_REQUEST.value(),
+                "Invalid Operation",
+                ex.getMessage(),
+                request.getRequestURI()
         );
 
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
