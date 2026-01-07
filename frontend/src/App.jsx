@@ -901,6 +901,318 @@ const generateInventory = () => {
 // Replace your existing DashboardPage component
 // ============================================
 
+// ============================================
+// LOGIN PAGE
+// ============================================
+const LoginPage = ({ onLogin }) => {
+  const { theme, themeName, setThemeName } = useTheme();
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [showDemoAccounts, setShowDemoAccounts] = useState(false);
+
+  const demoAccounts = [
+    { username: 'admin', password: 'admin123', role: 'ADMINISTRATOR', name: 'System Admin' },
+    { username: 'manager', password: 'manager123', role: 'MANAGER', name: 'Operations Manager' },
+    { username: 'clerk', password: 'clerk123', role: 'WAREHOUSE_CLERK', name: 'Warehouse Staff' },
+    { username: 'auditor', password: 'auditor123', role: 'AUDITOR', name: 'Internal Auditor' },
+    { username: 'viewer', password: 'viewer123', role: 'VIEWER', name: 'Guest Viewer' }
+  ];
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setIsLoading(true);
+
+    try {
+      const response = await fetch(`${API_BASE}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+
+      if (response.ok) {
+        const userData = await response.json();
+        onLogin(userData);
+      } else {
+        // Fallback to demo accounts for testing
+        const demo = demoAccounts.find(a => a.username === username && a.password === password);
+        if (demo) {
+          onLogin({
+            id: Math.random().toString(36).substr(2, 9),
+            username: demo.username,
+            name: demo.name,
+            role: demo.role,
+            email: `${demo.username}@supplychain.com`
+          });
+        } else {
+          setError('Invalid username or password');
+        }
+      }
+    } catch (err) {
+      // Fallback to demo accounts when API unavailable
+      const demo = demoAccounts.find(a => a.username === username && a.password === password);
+      if (demo) {
+        onLogin({
+          id: Math.random().toString(36).substr(2, 9),
+          username: demo.username,
+          name: demo.name,
+          role: demo.role,
+          email: `${demo.username}@supplychain.com`
+        });
+      } else {
+        setError('Invalid username or password');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const quickLogin = (account) => {
+    setUsername(account.username);
+    setPassword(account.password);
+  };
+
+  return (
+    <div style={{
+      minHeight: '100vh',
+      background: theme.colors.bg.primary,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '20px',
+      fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
+    }}>
+      <div style={{ position: 'absolute', top: '20px', right: '20px' }}>
+        <ThemeToggle />
+      </div>
+
+      <div style={{
+        width: '100%',
+        maxWidth: '420px',
+        background: theme.colors.bg.secondary,
+        borderRadius: '16px',
+        border: `1px solid ${theme.colors.border.subtle}`,
+        padding: '40px',
+        boxShadow: '0 4px 24px rgba(0,0,0,0.2)'
+      }}>
+        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+          <div style={{
+            width: '64px',
+            height: '64px',
+            background: theme.useGradients 
+              ? `linear-gradient(135deg, ${theme.colors.accent.primary}, ${theme.colors.accent.secondary})`
+              : theme.colors.bg.tertiary,
+            borderRadius: '16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: '0 auto 16px',
+            fontSize: '28px'
+          }}>
+            📦
+          </div>
+          <h1 style={{
+            fontSize: '24px',
+            fontWeight: '600',
+            color: theme.colors.text.primary,
+            marginBottom: '8px'
+          }}>
+            SupplyChain Ledger
+          </h1>
+          <p style={{ color: theme.colors.text.muted, fontSize: '14px' }}>
+            Blockchain-powered inventory management
+          </p>
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          {error && (
+            <div style={{
+              padding: '12px 16px',
+              background: theme.colors.status.error.bg,
+              border: `1px solid ${theme.colors.status.error.color}40`,
+              borderRadius: '8px',
+              color: theme.colors.status.error.color,
+              fontSize: '13px',
+              marginBottom: '20px'
+            }}>
+              {error}
+            </div>
+          )}
+
+          <div style={{ marginBottom: '20px' }}>
+            <label style={{
+              display: 'block',
+              fontSize: '13px',
+              fontWeight: '500',
+              color: theme.colors.text.secondary,
+              marginBottom: '8px'
+            }}>
+              Username
+            </label>
+            <input
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="Enter your username"
+              style={{
+                width: '100%',
+                padding: '12px 16px',
+                background: theme.colors.bg.tertiary,
+                border: `1px solid ${theme.colors.border.default}`,
+                borderRadius: '8px',
+                color: theme.colors.text.primary,
+                fontSize: '14px',
+                outline: 'none',
+                boxSizing: 'border-box'
+              }}
+              required
+            />
+          </div>
+
+          <div style={{ marginBottom: '24px' }}>
+            <label style={{
+              display: 'block',
+              fontSize: '13px',
+              fontWeight: '500',
+              color: theme.colors.text.secondary,
+              marginBottom: '8px'
+            }}>
+              Password
+            </label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Enter your password"
+              style={{
+                width: '100%',
+                padding: '12px 16px',
+                background: theme.colors.bg.tertiary,
+                border: `1px solid ${theme.colors.border.default}`,
+                borderRadius: '8px',
+                color: theme.colors.text.primary,
+                fontSize: '14px',
+                outline: 'none',
+                boxSizing: 'border-box'
+              }}
+              required
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={isLoading}
+            style={{
+              width: '100%',
+              padding: '14px',
+              background: theme.useGradients
+                ? `linear-gradient(135deg, ${theme.colors.accent.primary}, ${theme.colors.accent.secondary})`
+                : theme.colors.text.primary,
+              border: 'none',
+              borderRadius: '8px',
+              color: theme.useGradients ? 'white' : theme.colors.bg.primary,
+              fontSize: '14px',
+              fontWeight: '600',
+              cursor: isLoading ? 'not-allowed' : 'pointer',
+              opacity: isLoading ? 0.7 : 1,
+              transition: 'all 0.2s ease'
+            }}
+          >
+            {isLoading ? 'Signing in...' : 'Sign In'}
+          </button>
+        </form>
+
+        <div style={{ marginTop: '24px' }}>
+          <button
+            onClick={() => setShowDemoAccounts(!showDemoAccounts)}
+            style={{
+              width: '100%',
+              padding: '12px',
+              background: 'transparent',
+              border: `1px dashed ${theme.colors.border.default}`,
+              borderRadius: '8px',
+              color: theme.colors.text.secondary,
+              fontSize: '13px',
+              cursor: 'pointer'
+            }}
+          >
+            {showDemoAccounts ? 'Hide' : 'Show'} Demo Accounts
+          </button>
+
+          {showDemoAccounts && (
+            <div style={{
+              marginTop: '16px',
+              padding: '16px',
+              background: theme.colors.bg.tertiary,
+              borderRadius: '8px'
+            }}>
+              <p style={{
+                fontSize: '12px',
+                color: theme.colors.text.muted,
+                marginBottom: '12px'
+              }}>
+                Click to auto-fill credentials:
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {demoAccounts.map((account) => (
+                  <button
+                    key={account.username}
+                    onClick={() => quickLogin(account)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '10px 12px',
+                      background: theme.colors.bg.secondary,
+                      border: `1px solid ${theme.colors.border.subtle}`,
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    <div style={{ textAlign: 'left' }}>
+                      <div style={{ fontSize: '13px', color: theme.colors.text.primary, fontWeight: '500' }}>
+                        {account.name}
+                      </div>
+                      <div style={{ fontSize: '11px', color: theme.colors.text.muted }}>
+                        {account.username} / {account.password}
+                      </div>
+                    </div>
+                    <span style={{
+                      padding: '4px 8px',
+                      background: `${theme.colors.roles[account.role]}20`,
+                      color: theme.colors.roles[account.role],
+                      borderRadius: '4px',
+                      fontSize: '10px',
+                      fontWeight: '600'
+                    }}>
+                      {account.role.replace('_', ' ')}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <p style={{
+          marginTop: '24px',
+          textAlign: 'center',
+          fontSize: '12px',
+          color: theme.colors.text.muted
+        }}>
+          Secured with blockchain verification
+        </p>
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// DASHBOARD PAGE
+// ============================================
 const DashboardPage = ({ transfers, inventory, user }) => {
   const { theme, themeName } = useTheme();
   const [stats, setStats] = useState(null);
